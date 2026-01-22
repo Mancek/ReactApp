@@ -8,29 +8,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '24'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: |
-        npm ci
-    
-    - name: Build application
-      run: |
-        npm run build
-    
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
@@ -45,6 +23,13 @@ jobs:
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
         script: which docker || (curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh) && sudo usermod -aG docker $USER || true && sudo systemctl enable docker && sudo systemctl start docker
+    - name: Create deployment directory
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: sudo rm -rf /opt/docker/webapp && sudo mkdir -p /opt/docker/webapp && sudo chown $USER:$USER /opt/docker/webapp
     - name: Copy application files to VPS
       uses: appleboy/scp-action@v0.1.4
       with:
@@ -60,7 +45,7 @@ jobs:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
-        script: sudo rm -rf /opt/docker/webapp && mkdir -p /opt/docker/webapp && cd /opt/docker/webapp && docker stop webapp || true && docker rm webapp || true && docker build -t webapp:latest . && docker run -d --name webapp --restart unless-stopped -p 3000:80 webapp:latest
+        script: cd /opt/docker/webapp && docker stop webapp || true && docker rm webapp || true && docker build -t webapp:latest . && docker run -d --name webapp --restart unless-stopped -p 3000:80 webapp:latest
     - name: Health Check and Cleanup
       uses: appleboy/ssh-action@v0.1.5
       with:
