@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v3
@@ -38,33 +38,33 @@ jobs:
     - uses: actions/checkout@v3
     
     
-    - name: Setup VPS Environment
+    - name: Install Docker on VPS
       uses: appleboy/ssh-action@v0.1.5
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
-        script: sudo apt-get update && which node || (curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt-get install -y nodejs) && which pm2 || sudo npm install -g pm2
-    - name: Copy files to VPS
+        script: which docker || (curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh) && sudo usermod -aG docker $USER || true && sudo systemctl enable docker && sudo systemctl start docker
+    - name: Copy application files to VPS
       uses: appleboy/scp-action@v0.1.4
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
-        source: build/*
-        target: /var/www/webapp
-        strip_components: 1
-    - name: Deploy Application
+        source: .,!node_modules,!.git
+        target: /opt/docker/webapp
+        rm: True
+    - name: Build and Deploy Docker Container
       uses: appleboy/ssh-action@v0.1.5
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
-        script: mkdir -p /var/www/webapp && echo 'Files will be copied via SCP action' && cd /var/www/webapp && npm ci --production && which pm2 || sudo npm install -g pm2 && pm2 delete webapp || true && cd /var/www/webapp && pm2 start ecosystem.config.js --name webapp && pm2 save && sudo pm2 startup systemd -u $USER --hp $HOME || true
-    - name: Post-deployment Tasks
+        script: mkdir -p /opt/docker/webapp && cd /opt/docker/webapp && docker stop webapp || true && docker rm webapp || true && docker build -t webapp:latest . && docker run -d --name webapp --restart unless-stopped -p 3000:80 webapp:latest
+    - name: Health Check and Cleanup
       uses: appleboy/ssh-action@v0.1.5
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
-        script: sleep 10 && curl -f http://localhost:3000/health || curl -f http://localhost:3000/ || echo 'Health check failed' && sudo touch /var/log/webapp.log && sudo chown www-data:www-data /var/log/webapp.log
+        script: docker image prune -f && sleep 10 && curl -f http://localhost:3000/health || curl -f http://localhost:3000/ || echo 'Health check failed'
