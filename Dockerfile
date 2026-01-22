@@ -1,20 +1,27 @@
+# ---------- Build stage ----------
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+
+# ---------- Production stage ----------
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
+ENV NODE_ENV=production
+
 COPY package*.json ./
+RUN npm ci --omit=dev
 
+COPY --from=builder /app/dist ./dist
 
-
-# Install dependencies
-RUN npm ci --production
-
-# Copy source code
-COPY . .
-
-# Expose port
 EXPOSE 3000
 
-# Start application
-CMD ["npm", "run", "dev"]
+CMD ["node", "dist/index.js"]
