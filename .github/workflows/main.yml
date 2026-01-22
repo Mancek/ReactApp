@@ -53,14 +53,15 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         source: .,!node_modules,!.git
         target: /opt/docker/webapp
-        rm: True
+        strip_components: 0
+        overwrite: True
     - name: Build and Deploy Docker Container
       uses: appleboy/ssh-action@v0.1.5
       with:
         host: ${{ secrets.SSH_HOST }}
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.SSH_KEY }}
-        script: mkdir -p /opt/docker/webapp && cd /opt/docker/webapp && docker stop webapp || true && docker rm webapp || true && docker build -t webapp:latest . && docker run -d --name webapp --restart unless-stopped -p 3000:80 webapp:latest
+        script: sudo rm -rf /opt/docker/webapp && mkdir -p /opt/docker/webapp && cd /opt/docker/webapp && docker stop webapp || true && docker rm webapp || true && docker build -t webapp:latest . && docker run -d --name webapp --restart unless-stopped -p 3000:80 webapp:latest
     - name: Health Check and Cleanup
       uses: appleboy/ssh-action@v0.1.5
       with:
